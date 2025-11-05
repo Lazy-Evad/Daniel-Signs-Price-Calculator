@@ -1,0 +1,5 @@
+{
+  "name": "Day's Rental - Sticker Order Portal",
+  "description": "A simple application for clients to select predetermined items, add them to an order, and submit it with a purchase order number.",
+  "requestFramePermissions": []
+}
