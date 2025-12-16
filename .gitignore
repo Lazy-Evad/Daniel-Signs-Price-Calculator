@@ -27,3 +27,10 @@ dist-ssr
 # Python
 __pycache__/
 *.pyc
+.venv/
+venv/
+env/
+
+# Secrets - NEVER COMMIT THESE
+serviceAccountKey.json
+secrets.toml

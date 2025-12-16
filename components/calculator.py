@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
-from utils.db import fetch_materials
+from utils.db import fetch_materials, save_job
 from utils.logic_engine import PricingEngine
 
-def show_calculator(hourly_rate):
+def show_calculator(hourly_rate, client_info=None):
     st.header("Job Calculator")
     
     # Initialize Session State for Job Items if not exists
@@ -13,6 +13,7 @@ def show_calculator(hourly_rate):
     # Init Engine
     materials_list = fetch_materials()
     # Create dict for PricingEngine {Name: Price}
+    # Note: Using cost_per_m2 for calculation logic
     materials_dict = {m.get('name', 'Unknown'): m.get('cost_per_m2', 0.0) for m in materials_list}
     engine = PricingEngine(materials_dict, overhead_rate=hourly_rate)
     
@@ -108,17 +109,34 @@ def show_calculator(hourly_rate):
         st.markdown("---")
         st.header("Quote Dashboard")
         
+        # dynamic pricing overrides
+        with st.expander("⚙️ Adjust Pricing Factors", expanded=False):
+            c_p1, c_p2, c_p3 = st.columns(3)
+            with c_p1:
+                wastage = st.number_input("Wastage %", min_value=0.0, value=st.session_state.wastage_def, step=5.0)
+            with c_p2:
+                markup_std = st.number_input("Std Markup (x)", min_value=1.0, value=st.session_state.markup_std_def, step=0.1, format="%.1f")
+            with c_p3:
+                markup_prem = st.number_input("Prem Markup (x)", min_value=1.0, value=st.session_state.markup_prem_def, step=0.1, format="%.1f")
+        
         # Calculate using Engine
         results = engine.calculate_job(
             st.session_state.job_items, 
             prod_hours, 
             install_hours, 
-            installers=num_fitters
+            installers=num_fitters,
+            wastage_percent=wastage,
+            markup_std=markup_std,
+            markup_prem=markup_prem
         )
         
         # Display Results
         m1, m2, m3 = st.columns(3)
-        m1.metric("True Breakeven Cost", f"£{results['breakeven']:.2f}", help=f"Mat: {results['material_cost']:.2f} + Shop: {results['shop_cost']:.2f} + Install(Int): {results['install_cost_internal']:.2f}")
+        m1.metric(
+            "True Breakeven Cost", 
+            f"£{results['breakeven']:.2f}", 
+            help=f"Mat (inc {wastage}% waste): {results['material_cost_total']:.2f} + Shop: {results['shop_cost']:.2f} + Install(Int): {results['install_cost_internal']:.2f}"
+        )
         m2.metric("Standard Quote", f"£{results['standard_price']:.2f}", delta=f"Profit: £{results['standard_profit']:.2f}")
         m3.metric("Premium Quote", f"£{results['premium_price']:.2f}", delta=f"Profit: £{results['premium_profit']:.2f}")
         
@@ -126,6 +144,31 @@ def show_calculator(hourly_rate):
         margin_percent = results['standard_profit'] / results['standard_price'] if results['standard_price'] > 0 else 0.0
         safe_progress = max(0.0, min(1.0, margin_percent))
         st.progress(safe_progress, text=f"Standard Margin Health ({margin_percent*100:.1f}%)")
+        
+        # Save Job Button
+        st.divider()
+        col_save, col_space = st.columns([1, 4])
+        with col_save:
+            if st.button("💾 Save Estimate", type="primary"):
+                # Construct Payload
+                job_data = {
+                    "client": client_info,
+                    "items": st.session_state.job_items,
+                    "labor": {
+                        "prod_hours": prod_hours,
+                        "install_hours": install_hours,
+                        "fitters": num_fitters
+                    },
+                    "settings": {
+                        "wastage": wastage, 
+                        "markup_std": markup_std,
+                        "markup_prem": markup_prem
+                    },
+                    "results": results
+                }
+                
+                if save_job(job_data):
+                    st.balloons()
         
         # Breakdown details
         with st.expander("See Cost Breakdown Details"):
