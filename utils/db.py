@@ -76,8 +76,15 @@ def add_material(name, cost, width, supplier):
             st.error(f"Error adding to DB: {e}")
             return False
     else:
-        st.warning("Database not connected. Material not saved (Mock Mode).")
-        return True # Pretend it worked
+        # Mock Mode: Add to local list
+        MOCK_MATERIALS.append({
+            'name': name,
+            'cost_per_m2': float(cost),
+            'roll_width': float(width),
+            'supplier': supplier
+        })
+        st.success(f"Added {name} to local session (Mock Mode).")
+        return True
 
 def bulk_upload_materials(df):
     """
@@ -85,11 +92,20 @@ def bulk_upload_materials(df):
     Expected columns: 'Product', 'Price', 'Width', 'Supplier' (optional)
     """
     db = get_db()
-    if not db:
-        st.warning("Database not connected. Bulk upload skipped (Mock Mode).")
-        return 0
     
     count = 0
+    if not db:
+        # Mock Mode: Bulk add to local list
+        for index, row in df.iterrows():
+            MOCK_MATERIALS.append({
+                'name': row.get('Product', 'Unknown'),
+                'cost_per_m2': float(row.get('Price', 0.0)),
+                'roll_width': float(row.get('Width', 1.37)),
+                'supplier': row.get('Supplier', 'Unknown')
+            })
+            count += 1
+        return count
+    
     batch = db.batch()
     
     for index, row in df.iterrows():

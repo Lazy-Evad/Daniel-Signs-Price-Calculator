@@ -48,11 +48,11 @@ def show_calculator(hourly_rate):
                 
             c1, c2, c3, c4 = st.columns([2, 1, 2, 1])
             with c2:
-                width_unit = st.selectbox("Unit", ["m", "cm", "mm", "ft", "in"], index=1, key="w_unit")
+                width_unit = st.selectbox("Unit", ["m", "cm", "mm", "ft", "in"], key="w_unit")
             with c1:
                 width_input = st.number_input("Width", min_value=0.0, format=get_format(st.session_state.w_unit), key="w_input")
             with c4:
-                height_unit = st.selectbox("Unit", ["m", "cm", "mm", "ft", "in"], index=1, key="h_unit")
+                height_unit = st.selectbox("Unit", ["m", "cm", "mm", "ft", "in"], key="h_unit")
             with c3:
                 height_input = st.number_input("Height", min_value=0.0, format=get_format(st.session_state.h_unit), key="h_input")
                 
