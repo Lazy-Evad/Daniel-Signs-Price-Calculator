@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
-from components.calculator import show_calculator
+from components.calc_v2 import show_calculator as show_calculator_v2
 from components.supplier import show_supplier_manager
 from utils.db import fetch_jobs
+from utils.styles import get_custom_css
 
 # Page Configuration
 st.set_page_config(
@@ -12,38 +13,69 @@ st.set_page_config(
 )
 
 def main():
-    st.markdown("<h1 style='text-align: center;'>Daniel Signs Quote Calculator</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray; font-size: 0.8em;'>Built by Lazylabz</p>", unsafe_allow_html=True)
+    # --- Theme Logic ---
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'dark'
+
+    # Inject CSS
+    st.markdown(get_custom_css(st.session_state.theme), unsafe_allow_html=True)
 
     # --- Session State Init ---
     if 'hourly_rate' not in st.session_state:
         st.session_state.hourly_rate = 66.04
+    if 'workshop_rate' not in st.session_state:
+        st.session_state.workshop_rate = 60.00
+    if 'fitting_rate' not in st.session_state:
+        st.session_state.fitting_rate = 75.00
+    if 'travel_rate' not in st.session_state:
+        st.session_state.travel_rate = 75.00
     if 'wastage_def' not in st.session_state:
         st.session_state.wastage_def = 15.0
-    if 'markup_std_def' not in st.session_state:
-        st.session_state.markup_std_def = 2.5
-    if 'markup_prem_def' not in st.session_state:
-        st.session_state.markup_prem_def = 4.0
+    if 'markup_def' not in st.session_state:
+        st.session_state.markup_def = 3.0
 
-    # --- Sidebar Settings ---
-    # Moved Overhead Settings to 'Settings' tab
+    # --- Sidebar: Client Details ---
+    with st.sidebar:
+        st.markdown("### 👤 CLIENT DETAILS")
+        # Simplified labels as per requested look
+        c_name = st.text_input("Client Name", placeholder="Start typing...")
+        c_contact = st.text_input("Contact / Ref", placeholder="e.g. email or PO#")
+        j_desc = st.text_area("Job Description", placeholder="Brief description...")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Reset buttons grouped
+        if st.button("♻️ RESET CALCULATOR"):
+            st.session_state.job_items = []
+            st.rerun()
+
+    client_info = {"name": c_name, "contact": c_contact, "description": j_desc}
+
+    # --- TOP HEADER BAR ---
+    h_col1, h_col2, h_col3 = st.columns([4, 1.5, 2.5])
     
-    st.sidebar.header("Client Details")
-    c_name = st.sidebar.text_input("Client Name", placeholder="Start typing...")
-    c_contact = st.sidebar.text_input("Contact / Ref", placeholder="e.g. email or PO#")
-    j_desc = st.sidebar.text_area("Job Description", placeholder="Brief description of the job...")
-    
-    client_info = {
-        "name": c_name,
-        "contact": c_contact,
-        "description": j_desc
-    }
-    
-    # --- Main Navigation ---
-    tab_calc, tab_supp, tab_hist, tab_settings = st.tabs(["💰 Calculator", "📦 Supplier Manager", "📜 Job History", "⚙️ Settings"])
+    with h_col1:
+        # NAVIGATION TABS on the Left
+        tab_calc, tab_supp, tab_hist, tab_settings = st.tabs(["💰 Calculator", "📦 Supplier Manager", "📜 Job History", "⚙️ Settings"])
+
+    with h_col2:
+        # THEME TOGGLE shifted toward center/right
+        st.markdown("<p style='text-align:right; font-size:0.8rem; font-weight:700; opacity:0.6; margin-top:12px;'>THEME</p>", unsafe_allow_html=True)
+        prev_theme = st.session_state.theme
+        dark_mode = st.toggle("🌙", value=(st.session_state.theme == 'dark'), label_visibility="collapsed", key="top_bar_theme")
+        st.session_state.theme = 'dark' if dark_mode else 'light'
+        if prev_theme != st.session_state.theme:
+            st.rerun()
+
+    with h_col3:
+        # BRANDING TITLE on the Right
+        st.markdown("<h3 style='color:#FB923C; text-align:right; margin:0; padding-top:10px; font-size:1.4rem !important;'>DANIEL SIGNS OPERATIONS HUB</h3>", unsafe_allow_html=True)
     
     with tab_calc:
-        show_calculator(st.session_state.hourly_rate, client_info)
+        # Emergency Reset if data format changed
+        if st.sidebar.button("♻️ RESET CALCULATOR STATE"):
+            st.session_state.job_items = []
+            st.rerun()
+        show_calculator_v2(st.session_state.hourly_rate, client_info)
         
     with tab_supp:
         show_supplier_manager()
@@ -80,8 +112,7 @@ def main():
                     "Client": c_info.get('name', 'Unknown'),
                     "Reference": c_info.get('contact', ''),
                     "Description": c_info.get('description', ''),
-                    "Quote (Std)": res.get('standard_price', 0),
-                    "Quote (Prem)": res.get('premium_price', 0),
+                    "Quote": res.get('quote_price', res.get('standard_price', 0)), # Fallback for old records
                 })
             
             df_hist = pd.DataFrame(history_data)
@@ -103,10 +134,9 @@ def main():
                     "Date": st.column_config.TextColumn("Date", width="medium"),
                     "Client": st.column_config.TextColumn("Client", width="medium"),
                     "Description": st.column_config.TextColumn("Description", width="large"),
-                    "Quote (Std)": st.column_config.NumberColumn("Quote (Std)", format="£%.2f"),
-                    "Quote (Prem)": st.column_config.NumberColumn("Quote (Prem)", format="£%.2f"),
+                    "Quote": st.column_config.NumberColumn("Quote", format="£%.2f"),
                 },
-                disabled=["ID", "Date", "Client", "Reference", "Description", "Quote (Std)", "Quote (Prem)"]
+                disabled=["ID", "Date", "Client", "Reference", "Description", "Quote"]
             )
             
             # Delete Logic
@@ -127,14 +157,43 @@ def main():
     with tab_settings:
         st.header("System Settings")
         st.subheader("Financial Defaults")
-        st.number_input(
-            "Hourly Shop Rate (£)", 
-            min_value=0.0,
-            step=1.0, 
-            format="%.2f",
-            key="hourly_rate",
-            help="The cost of running the shop per hour (overhead)."
-        )
+        col_rates1, col_rates2 = st.columns(2)
+        with col_rates1:
+            st.number_input(
+                "Workshop Rate (£/hr/person)", 
+                min_value=0.0,
+                step=1.0, 
+                format="%.2f",
+                key="workshop_rate",
+                help="Rate charged for production/workshop time per person."
+            )
+            st.number_input(
+                "Fitting Rate (£/hr/person)", 
+                min_value=0.0,
+                step=1.0, 
+                format="%.2f",
+                key="fitting_rate",
+                help="Rate charged for installation/fitting time per person."
+            )
+        with col_rates2:
+            st.number_input(
+                "Traveling Rate (£/hr/person)", 
+                min_value=0.0,
+                step=1.0, 
+                format="%.2f",
+                key="travel_rate",
+                help="Rate charged for travel time per person."
+            )
+            st.number_input(
+                "Internal Shop Overhead (£/hr)", 
+                min_value=0.0,
+                step=1.0, 
+                format="%.2f",
+                key="hourly_rate",
+                help="The internal cost of running the shop per hour (for breakeven)."
+            )
+
+        st.divider()
         st.number_input(
             "Material Wastage (%)", 
             min_value=0.0,
@@ -144,25 +203,15 @@ def main():
             help="Percentage of material cost added to cover offcuts and errors."
         )
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.number_input(
-                "Standard Markup (x)", 
-                min_value=1.0,
-                step=0.1, 
-                format="%.1f",
-                key="markup_std_def",
-                help="Multiplier applied to material cost for standard pricing."
-            )
-        with c2:
-            st.number_input(
-                "Premium Markup (x)", 
-                min_value=1.0,
-                step=0.1, 
-                format="%.1f",
-                key="markup_prem_def",
-                help="Multiplier applied to material cost for premium pricing."
-            )
+        st.slider(
+            "Markup Multiplier (x)", 
+            min_value=2.5,
+            max_value=5.0,
+            step=0.1, 
+            format="%.1f",
+            key="markup_def",
+            help="Multiplier applied to material cost for quoting."
+        )
 
 if __name__ == "__main__":
     main()
