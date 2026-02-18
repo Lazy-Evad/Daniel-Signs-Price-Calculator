@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
-from components.calc_v2 import show_calculator as show_calculator_v2
+from components.calc_v5 import show_calculator as show_calculator_v5
 from components.supplier import show_supplier_manager
 from utils.db import fetch_jobs, delete_job
 from utils.styles import inject_dashboard_css
 
-# Page Configuration
+# Page Configuration (v1.1 - Updated Markup Logic)
 st.set_page_config(
     page_title="Daniel Signs Quote Calculator",
     page_icon="📏",
@@ -23,7 +23,7 @@ def main():
     # --- Session State Init ---
     defaults = {
         "hourly_rate": 66.04, "workshop_rate": 60.00, "fitting_rate": 75.00,
-        "travel_rate": 75.00, "wastage_def": 15.0, "markup_def": 3.0, "job_items": []
+        "travel_rate": 75.00, "wastage_v5": 15.0, "markup_v5": 1.0, "job_items": []
     }
     for key, val in defaults.items():
         if key not in st.session_state: st.session_state[key] = val
@@ -50,7 +50,7 @@ def main():
     header_left, header_mid, header_right = st.columns([3, 1, 1.5])
     
     with header_left:
-        st.markdown('<p class="ds-title">DANIEL SIGNS HUB</p>', unsafe_allow_html=True)
+        st.markdown('<p class="ds-title">DANIEL SIGNS HUB <span style="font-size: 12px; color: #888;">[v1.3]</span></p>', unsafe_allow_html=True)
     
     with header_right:
         # Theme toggle area
@@ -68,7 +68,7 @@ def main():
     )
 
     with tab_calc:
-        show_calculator_v2(st.session_state.hourly_rate, client_info)
+        show_calculator_v5(st.session_state.hourly_rate, client_info)
         
     with tab_supp:
         show_supplier_manager()
@@ -77,41 +77,88 @@ def main():
         st.header("Job History")
         jobs = fetch_jobs()
         if jobs:
-            history_data = []
-            for j in jobs:
+            # Inject Custom Table CSS for Borders
+            st.markdown("""
+                <style>
+                /* Target Streamlit columns specifically in the Job History section */
+                [data-testid="stColumn"] {
+                    border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
+                    padding-right: 15px !important;
+                    padding-left: 15px !important;
+                }
+                [data-testid="stColumn"]:last-child {
+                    border-right: none !important;
+                }
+                div.stButton > button { padding: 0px; }
+                </style>
+            """, unsafe_allow_html=True)
+
+            # Display Header
+            h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1.5, 2, 3, 1.2, 1.2, 1.2, 0.8, 0.8])
+            h1.markdown("**Date**")
+            h2.markdown("**Client**")
+            h3.markdown("**Description**")
+            h4.markdown("**Cost to Produce**")
+            h5.markdown("**Quote**")
+            h6.markdown("**Profit**")
+            h7.markdown("**Details**")
+            h8.markdown("**Del**")
+            st.divider()
+
+            for i, j in enumerate(jobs):
                 c_info = j.get('client', {}) or {}
                 res = j.get('results', {}) or {}
                 raw_date = j.get('created_at')
+                if hasattr(raw_date, 'strftime'):
+                    date_str = raw_date.strftime("%b %d, %Y")
+                else:
+                    date_str = str(raw_date)[:10]
                 
-                # Calculate Profit (Quote - Material Costs)
                 quote_val = res.get('quote_price', 0)
-                mat_cost_val = res.get('material_cost_total', 0)
-                profit_val = quote_val - mat_cost_val
+                cost_val = res.get('breakeven', 0)
+                profit_val = res.get('profit', 0)
+                markup_val = j.get('markup', 'N/A')
 
-                history_data.append({
-                    "ID": j.get('id'), 
-                    "Delete": False, 
-                    "Date": raw_date, 
-                    "Client": c_info.get('name', 'Unknown'),
-                    "Description": c_info.get('description', ''), 
-                    "Quote": quote_val,
-                    "Profit": profit_val
-                })
-            
-            df_history = pd.DataFrame(history_data)
-            
-            # Professional column configuration
-            st.data_editor(
-                df_history, 
-                use_container_width=True, 
-                hide_index=True,
-                column_config={
-                    "ID": None,  # Hides the ID column from view
-                    "Date": st.column_config.DateColumn("Date", format="MMM DD, YYYY"),
-                    "Quote": st.column_config.NumberColumn("Quote", format="£%.2f"),
-                    "Profit": st.column_config.NumberColumn("Profit", format="£%.2f"),
-                }
-            )
+                r1, r2, r3, r4, r5, r6, r7, r8 = st.columns([1.5, 2, 3, 1.2, 1.2, 1.2, 0.8, 0.8])
+                r1.write(date_str)
+                r2.write(c_info.get('name', 'Unknown'))
+                r3.write(c_info.get('description', ''))
+                r4.write(f"£{cost_val:,.2f}")
+                r5.write(f"£{quote_val:,.2f}")
+                r6.write(f"£{profit_val:,.2f}")
+
+                
+                with r7:
+                    if st.button("👁️", key=f"view_{i}", help="View Details Icon"):
+                        st.session_state[f"show_details_{i}"] = not st.session_state.get(f"show_details_{i}", False)
+                
+                with r8:
+                    if st.button("🗑️", key=f"del_job_{i}", help="Delete Job"):
+                        if delete_job(j.get('id')):
+                            st.toast(f"Deleted job for {c_info.get('name')}")
+                            st.rerun()
+
+                if st.session_state.get(f"show_details_{i}", False):
+                    with st.container(border=True):
+                        st.markdown(f"#### Detailed Breakdown - {c_info.get('name')}")
+                        st.markdown(f"**Markup Used:** {markup_val}x")
+                        
+                        cols = st.columns(2)
+                        with cols[0]:
+                            st.markdown("**Items & Labour:**")
+                            for item in j.get('items', []):
+                                st.write(f"- {item['description']}")
+                        
+                        with cols[1]:
+                            st.markdown("**Financial Summary:**")
+                            st.write(f"- Material Cost: £{res.get('material_cost_total', 0):,.2f}")
+                            st.write(f"- Labour/Internal Cost: £{res.get('shop_cost_internal', 0) + res.get('install_cost_internal', 0) + res.get('travel_cost_internal', 0):,.2f}")
+                            st.write(f"- Total Cost to Produce: £{cost_val:,.2f}")
+                            st.write(f"- Markup Multiplier: {markup_val}x")
+                            st.write(f"- Final Quote: £{quote_val:,.2f}")
+                            st.write(f"**- Calculated Profit: £{profit_val:,.2f}**")
+                
+                st.divider()
         else:
             st.info("No saved jobs found.")
             
@@ -121,9 +168,8 @@ def main():
         st.number_input("Fitting Rate (£/hr)", key="fitting_rate")
         st.number_input("Travel Rate (£/hr)", key="travel_rate")
         st.number_input("Shop Overhead (£/hr)", key="hourly_rate")
-        st.divider()
-        st.number_input("Material Wastage (%)", key="wastage_def")
-        st.slider("Markup Multiplier (x)", min_value=2.5, max_value=5.0, key="markup_def")
+        # Removed Wastage and Markup from here as they are now live in the Calculator tab
+
 
 if __name__ == "__main__":
     main()

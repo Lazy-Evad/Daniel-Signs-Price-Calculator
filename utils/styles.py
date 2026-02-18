@@ -184,6 +184,38 @@ def get_custom_css(theme: str):
         color: #000 !important;
         font-weight: 800 !important;
       }}
+
+      /* MULTISELECT TAGS & SELECTBOX VISIBILITY */
+      span[data-baseweb="tag"] {{
+        background-color: var(--accent) !important;
+        color: #000 !important;
+      }}
+      
+      div[data-baseweb="select"] span {{
+        color: var(--text) !important;
+      }}
+      
+      /* Ensure selectbox dropdown arrows and text are visible */
+      [data-testid="stSelectbox"] svg {{
+        fill: var(--text) !important;
+      }}
+
+      [data-baseweb="select"] div {{
+        color: var(--text) !important;
+      }}
+
+      /* TOGGLE FIX FOR LIGHT MODE (Track Visibility) */
+      div[data-testid="stToggle"] div[data-baseweb="checkbox"] > div:first-child,
+      div[data-testid="stCheckbox"] div[data-baseweb="checkbox"] > div:first-child {{
+        background-color: #64748b !important; /* Dark slate grey track */
+        border: 1px solid rgba(0,0,0,0.2) !important;
+      }}
+      
+      div[data-testid="stToggle"] div[data-baseweb="checkbox"][aria-checked="true"] > div:first-child,
+      div[data-testid="stCheckbox"] div[data-baseweb="checkbox"][aria-checked="true"] > div:first-child {{
+        background-color: var(--accent) !important;
+        border-color: var(--accent) !important;
+      }}
     </style>
     """
 

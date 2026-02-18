@@ -1,12 +1,14 @@
-# Daniel Signs Quote Calculator - Version 1.0 (Alpha)
+# Daniel Signs Quote Calculator - v1.3 (Pro Dashboard)
 
-**Current Status:** Fully Functional with Cloud Database.
+**Current Status:** Fully Functional with Advanced Metrics & Cloud Database.
 
 ### ✅ Working Features
-1.  **Pricing Calculator**:
-    *   Calculates Standard & Premium quotes based on Material + Labor + Wastage + Markup.
-    *   **Smart Units**: Auto-detects if you enter Millimeters (e.g. 1370) and converts to Meters (1.37).
-    *   **Client Info**: Dedicated sidebar for Client Name & Reference.
+1.  **Pro Pricing Engine**:
+    *   **Dynamic Profit**: Markup Multiplier (x1 - x10) to control margin.
+    *   **Live Metrics**: Internal Base Cost vs. Billable Quote visibility.
+    *   **Live Labour**: Instant pricing updates as you type production/install hours.
+    *   **Smart Units**: Default 'cm' units with auto-conversion for meter-based pricing.
+    *   **Client Info**: Dedicated sidebar for Client Name, Ref, and Job Description.
 
 2.  **Supplier Manager (Database)**:
     *   **Cloud Synced**: All materials saved to Google Firestore.
@@ -18,12 +20,17 @@
     *   **Cloud Storage**: History persists even after computer restart.
     *   **Management**: View old quotes, see references, and **DELETE** bad entries.
 
+4.  **PDF Export**:
+    *   **Professional Layout**: Branded quotation with Daniel Signs logo and orange accent.
+    *   **Client Details**: Auto-populates name, contact, reference, and job description.
+    *   **Itemized Breakdown**: Lists all materials and labour included in the quote.
+    *   **Dual Download**: Browser download OR direct save-to-desktop for maximum compatibility.
+
 ### 🚀 How to Run
 Simply double-click the **`Start_Calculator.bat`** file in this folder. It will open the app in your browser automatically.
 (You do not need to open VS Code/Cursor).
 
 ### 🔜 Future Ideas (To Discuss with Partner)
-- [ ] **PDF Export**: Button to generate a respectable PDF quote to email clients.
 - [ ] **Sheet Material Editing**: Adding the "Editable Grid" feature to Sheet boards (currently only on Vinyls).
 - [ ] **User Accounts**: If you expand to multiple staff members.
 - [ ] **Trello Integration**: "Approve" button that automatically creates a Trello card for the job.
