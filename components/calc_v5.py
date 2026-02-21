@@ -338,25 +338,49 @@ def show_calculator(hourly_rate, client_info=None):
                 try:
                     from io import BytesIO
                     import os
-                    
-                    pdf_bytes = generate_quote_pdf(client_info, st.session_state.job_items, results, markup_val)
+                    import re
+
+                    # Capture timestamp & user at click time
+                    now        = datetime.now()
+                    user_name  = st.session_state.get('name', 'Unknown')
+
+                    pdf_bytes  = generate_quote_pdf(
+                        client_info,
+                        st.session_state.job_items,
+                        results,
+                        markup_val,
+                        created_by=user_name,
+                        timestamp=now,
+                        labour_hours={
+                            'prod':    tot_p,
+                            'inst':    tot_i,
+                            'trav':    tot_t,
+                            'design':  st.session_state.get('design_hours', 0.0),
+                            'fitters': tot_f,
+                        }
+                    )
                     pdf_buffer = BytesIO(pdf_bytes)
-                    
+
+                    # Build a clean filename: DanielSigns_Quote_ClientName_YYYY-MM-DD.pdf
+                    safe_client = re.sub(r'[^\w\s-]', '', client_info.get('name', 'Client') or 'Client')
+                    safe_client = re.sub(r'\s+', '_', safe_client.strip()) or 'Client'
+                    pdf_filename = f"DanielSigns_Quote_{safe_client}_{now.strftime('%Y-%m-%d')}.pdf"
+
                     col1, col2 = st.columns(2)
                     with col1:
                         st.download_button(
                             label="📄 DOWNLOAD PDF",
                             data=pdf_buffer,
-                            file_name="Quote.pdf",
+                            file_name=pdf_filename,
                             mime="application/pdf",
                             use_container_width=True
                         )
                     with col2:
                         if st.button("💾 SAVE TO DESKTOP", use_container_width=True):
-                            desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "DanielSigns_Quote.pdf")
+                            desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", pdf_filename)
                             with open(desktop_path, "wb") as f:
                                 f.write(pdf_bytes)
-                            st.success(f"✅ Saved to Desktop!")
+                            st.success(f"✅ Saved: {pdf_filename}")
                 except Exception as e:
                     st.error(f"PDF Error: {str(e)}")
             else:

@@ -261,3 +261,47 @@ def delete_material(mat_id):
         global MOCK_MATERIALS
         MOCK_MATERIALS = [m for m in MOCK_MATERIALS if m.get('id') != mat_id]
         return True
+
+# ── Settings persistence ─────────────────────────────────────────────────────
+
+SETTINGS_DEFAULTS = {
+    "hourly_rate":   66.04,
+    "workshop_rate": 60.00,
+    "fitting_rate":  75.00,
+    "travel_rate":   75.00,
+}
+
+def load_settings():
+    """
+    Load rate settings from Firestore 'settings/rates' document.
+    Returns a dict with the four rate keys, falling back to hardcoded defaults.
+    """
+    db = get_db()
+    if db:
+        try:
+            doc = db.collection('settings').document('rates').get()
+            if doc.exists:
+                data = doc.to_dict()
+                # Merge with defaults so any missing key still has a value
+                return {k: float(data.get(k, v)) for k, v in SETTINGS_DEFAULTS.items()}
+        except Exception as e:
+            st.warning(f"Could not load settings from DB — using defaults. ({e})")
+    return dict(SETTINGS_DEFAULTS)
+
+
+def save_settings(rate_dict):
+    """
+    Persist rate settings to Firestore 'settings/rates' document.
+    rate_dict: dict with keys hourly_rate, workshop_rate, fitting_rate, travel_rate
+    """
+    db = get_db()
+    if db:
+        try:
+            db.collection('settings').document('rates').set(
+                {k: float(v) for k, v in rate_dict.items()}
+            )
+            return True
+        except Exception as e:
+            st.error(f"Error saving settings: {e}")
+            return False
+    return False

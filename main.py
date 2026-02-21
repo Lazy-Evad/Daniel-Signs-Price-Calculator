@@ -4,6 +4,7 @@ import pandas as pd
 from components.calc_v5 import show_calculator as show_calculator_v5
 from components.supplier import show_supplier_manager
 from utils.db import fetch_jobs, delete_job
+from utils.settings_store import load_settings_local, save_settings_local, SETTINGS_DEFAULTS
 from utils.styles import inject_dashboard_css
 
 # Page Configuration
@@ -75,12 +76,28 @@ def main():
     inject_dashboard_css()
 
     # --- Session State Init ---
-    defaults = {
-        "hourly_rate": 66.04, "workshop_rate": 60.00, "fitting_rate": 75.00,
-        "travel_rate": 75.00, "wastage_v5": 15.0, "markup_v5": 1.0, "job_items": []
+    # Load rates from JSON file on EVERY fresh session.
+    # We use 'settings_loaded' flag so we only hit the file once per session,
+    # not on every Streamlit rerun.
+    if not st.session_state.get('settings_loaded', False):
+        saved = load_settings_local()
+        # Write directly into session state using the engine keys
+        for k, v in saved.items():
+            st.session_state[k] = v
+        # Also initialise the dedicated form display keys (cfg_*)
+        # so the Settings tab widgets always render with the correct value.
+        st.session_state['cfg_workshop'] = saved['workshop_rate']
+        st.session_state['cfg_fitting']  = saved['fitting_rate']
+        st.session_state['cfg_travel']   = saved['travel_rate']
+        st.session_state['cfg_overhead'] = saved['hourly_rate']
+        st.session_state.settings_loaded  = True
+
+    other_defaults = {
+        'wastage_v5': 15.0, 'markup_v5': 1.0, 'job_items': []
     }
-    for key, val in defaults.items():
-        if key not in st.session_state: st.session_state[key] = val
+    for key, val in other_defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = val
 
     # --- Sidebar ---
     with st.sidebar:
@@ -93,7 +110,9 @@ def main():
         if st.button("♻️ RESET CALCULATOR", use_container_width=True):
             st.session_state.job_items = []; st.rerun()
         if st.button("♻️ RESET FULL STATE", use_container_width=True):
-            for k in defaults:
+            # Clear everything except auth cookies
+            keys_to_clear = list(other_defaults.keys()) + ['settings_loaded']
+            for k in keys_to_clear:
                 if k in st.session_state: del st.session_state[k]
             st.rerun()
 
@@ -208,12 +227,40 @@ def main():
             st.info("No saved jobs found.")
 
     with tab_settings:
-        st.header("Settings")
-        st.number_input("Workshop Rate (£/hr)", key="workshop_rate")
-        st.number_input("Fitting Rate (£/hr)",  key="fitting_rate")
-        st.number_input("Travel Rate (£/hr)",   key="travel_rate")
-        st.number_input("Shop Overhead (£/hr)", key="hourly_rate")
+        st.header('Settings')
+        st.caption('Rates are saved locally on this machine and persist across all logins.')
+        st.divider()
+
+        # The cfg_* keys were pre-loaded from the JSON file at startup,
+        # so these widgets always show the correct saved values from first render.
+        st.number_input('Workshop Rate (GBP/hr)',  min_value=0.0, step=0.5,
+                        format='%.2f', key='cfg_workshop')
+        st.number_input('Fitting Rate (GBP/hr)',   min_value=0.0, step=0.5,
+                        format='%.2f', key='cfg_fitting')
+        st.number_input('Travel Rate (GBP/hr)',    min_value=0.0, step=0.5,
+                        format='%.2f', key='cfg_travel')
+        st.number_input('Shop Overhead (GBP/hr)',  min_value=0.0, step=0.5,
+                        format='%.2f', key='cfg_overhead')
+
+        st.divider()
+        if st.button('SAVE SETTINGS', use_container_width=True):
+            # Copy cfg_ widget values into the engine session state keys
+            st.session_state.workshop_rate = st.session_state.cfg_workshop
+            st.session_state.fitting_rate  = st.session_state.cfg_fitting
+            st.session_state.travel_rate   = st.session_state.cfg_travel
+            st.session_state.hourly_rate   = st.session_state.cfg_overhead
+
+            ok = save_settings_local({
+                'workshop_rate': st.session_state.workshop_rate,
+                'fitting_rate':  st.session_state.fitting_rate,
+                'travel_rate':   st.session_state.travel_rate,
+                'hourly_rate':   st.session_state.hourly_rate,
+            })
+            if ok:
+                st.success('Settings saved! Will persist across all future logins.')
+            else:
+                st.error('Could not save settings file. Check folder permissions.')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
